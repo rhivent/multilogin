@@ -1,0 +1,116 @@
+Sumber:
+Creating Multiple Authentication in Laravel 5.5 Using Middleware
+
+https://hackernoon.com/laravel-multiple-authentication-80daa855322b
+
+1. Prerequisites
+For the purpose of this tutorial, I assume that you have a PHP application installed on a web server. My setup is:
+
+==> PHP 7.1
+==> MySQL
+==> Laravel 5.5
+To make sure that that I could focus on the tutorial without being bogged down by server setup and management issues, I decided to host my Laravel application on Cloudways managed servers because they take care of server level issues and has a powerful devstack that is optimized for hosting Laravel.
+
+2. Create the Laravel Project
+    composer create-project — prefer-dist laravel/laravel blog
+
+3. Configure the Database
+After successfully installing the Laravel app, the next step is database configuration. Let’s open .env file and the config/database.php file and set database credentials in these files.
+
+4. Set Admin Middleware
+Next, open the migration of user in Database/migration/…user.php and update the following field for Admin.
+    $table->boolean(‘isAdmin’)->nullable();
+
+5. Run the Migration
+After creating the database and adding the configuration settings, run the following command to create tables in the database.
+    Php artisan migrate
+
+6. Laravel Auth
+Laravel provides a built-in authentication system for registration and login. Simply enter the following command in the terminal:
+    Php artisan make:auth
+
+7. Create the Middleware Admin
+    php artisan make:middleware Admin
+
+Next, go to app/Http/ Middleware/Admin.php. You will notice that the file already contains boilerplate code provided by Laravel. In this code, you only have to deal with a single function, handle() . Update the code in this function with the following code:
+
+    public function handle($request, Closure $next)
+    {
+        if(auth()->user()->isAdmin == 1){
+            return $next($request);
+        }
+    return redirect(‘home’)->with(‘error’,’You have not admin access’);
+    }
+
+Now, register this route in the app/Http/Kernel.php . Update the $routeMiddleware property with:
+
+<?php
+// Kernel.php
+protected $routeMiddleware = [
+‘auth’ => \Illuminate\Auth\Middleware\Authenticate::class,
+‘auth.basic’ => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+‘bindings’ => \Illuminate\Routing\Middleware\SubstituteBindings::class,
+‘can’ => \Illuminate\Auth\Middleware\Authorize::class,
+‘guest’ => \App\Http\Middleware\RedirectIfAuthenticated::class,
+‘throttle’ => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+‘admin’ => \App\Http\Middleware\Admin::class,
+];.
+?>
+
+8. Config the Admin Protected Route
+Next, I will create the route for admin. Open the routes/web.php file and enter the following code in it:
+    Route::get(‘admin/routes’, ‘HomeController@admin’)->middleware(‘admin’);
+
+9. Create the Controller
+Let’s open the app/http/controller/HomeController and update the following methods.
+
+    public function index()
+    {
+        return view(‘home’);
+    }
+    public function admin()
+    { 
+        return view(‘admin’); 
+    }
+10. Create the Home View
+After setting up the protected admin route, open the resources/views/home.blade.php file and update the following code:
+
+@extends(‘layouts.app’)
+@section(‘content’)
+    <div class=”container”>
+        @if(\Session::has(‘error’))
+        <div class=”alert alert-danger”>
+        {{\Session::get(‘error’)}}
+        </div>
+        @endif
+        <div class=”row”>
+            <div class=”col-md-8 col-md-offset-2">
+                <div class=”panel panel-default”>
+                    <div class=”panel-heading”>Dashboard</div>
+                    <?php if(auth()->user()->isAdmin == 1){?>
+                        <div class=”panel-body”>
+                        <a href=”{{url(‘admin/routes’)}}”>Admin</a>
+                    </div><?php } else echo ‘<div class=”panel-heading”>Normal User</div>’;?>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+In this code, I used if(auth()->user()->isAdmin == 1) to check the user profile. If it is admin, it will navigate to the admin area. Otherwise, it will redirect to users area.
+
+11. Create Admin View
+Create a view called admin.blade.php in the root of the views folder, and add the following code to it:
+
+@extends(‘layouts.app’)
+@section(‘content’)
+    <div class=”row”>
+        <div class=”col-md-8 col-md-offset-2">
+            <div class=”panel panel-default”>
+                <div class=”panel-heading btn-primary”>WELCOME TO ADMIN ROUTE</div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+12. Results Admin Auth and User Auth
